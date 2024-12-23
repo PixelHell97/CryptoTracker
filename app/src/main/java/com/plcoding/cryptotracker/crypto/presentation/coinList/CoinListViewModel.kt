@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.plcoding.cryptotracker.core.domain.util.onError
 import com.plcoding.cryptotracker.core.domain.util.onSuccess
 import com.plcoding.cryptotracker.crypto.domain.CoinDataSource
+import com.plcoding.cryptotracker.crypto.presentation.models.CoinUi
 import com.plcoding.cryptotracker.crypto.presentation.models.toCoinUi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.ZonedDateTime
 
 class CoinListViewModel(
     private val coinDataSource: CoinDataSource,
@@ -34,12 +36,29 @@ class CoinListViewModel(
     fun onAction(action: CoinListActions) {
         when (action) {
             is CoinListActions.OnCoinClick -> {
-                _state.update {
-                    it.copy(
-                        currentCoin = action.coinUi,
-                    )
-                }
+                selectCoin(action.coinUi)
             }
+        }
+    }
+
+    private fun selectCoin(coinUi: CoinUi) {
+        _state.update {
+            it.copy(
+                currentCoin = coinUi,
+            )
+        }
+
+        viewModelScope.launch {
+            coinDataSource
+                .getCoinHistory(
+                    coinId = coinUi.id,
+                    start = ZonedDateTime.now().minusDays(5),
+                    end = ZonedDateTime.now(),
+                ).onSuccess { history ->
+                    println(history)
+                }.onError { error ->
+                    _event.send(CoinListEvent.Error(error))
+                }
         }
     }
 
